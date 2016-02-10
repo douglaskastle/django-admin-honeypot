@@ -3,7 +3,6 @@ from admin_honeypot.forms import HoneypotLoginForm
 from admin_honeypot.models import LoginAttempt
 from admin_honeypot.signals import honeypot
 from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.contrib.auth.views import redirect_to_login
 from django.core.urlresolvers import reverse
 from django.shortcuts import redirect
 from django.utils.translation import ugettext as _
@@ -17,16 +16,16 @@ class AdminHoneypot(generic.FormView):
     def dispatch(self, request, *args, **kwargs):
         if not request.path.endswith('/'):
             return redirect(request.path + '/', permanent=True)
-
-        # Django redirects the user to an explicit login view with
-        # a next parameter, so emulate that.
-        login_url = reverse('admin_honeypot:login')
-        if request.path != login_url:
-            return redirect_to_login(request.get_full_path(), login_url)
-
+        # Django 1.7 redirects the user to an explicit login view with
+        # a next parameter, so emulate that if needed.
+        if django.VERSION >= (1, 7):
+            login_url = reverse('admin_honeypot:login')
+            if request.path != login_url:
+                from django.contrib.auth.views import redirect_to_login
+                return redirect_to_login(request.get_full_path(), login_url)
         return super(AdminHoneypot, self).dispatch(request, *args, **kwargs)
 
-    def get_form(self, form_class):
+    def get_form(self, form_class=form_class):
         return form_class(self.request, **self.get_form_kwargs())
 
     def get_context_data(self, **kwargs):
@@ -34,7 +33,7 @@ class AdminHoneypot(generic.FormView):
         path = self.request.get_full_path()
         context.update({
             'app_path': path,
-            REDIRECT_FIELD_NAME: reverse('admin_honeypot:index'),
+            REDIRECT_FIELD_NAME: path,
             'title': _('Log in'),
         })
         return context
